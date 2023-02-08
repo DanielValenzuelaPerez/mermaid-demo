@@ -1,5 +1,6 @@
+# Flow Chart
 ```mermaid
-flowchart LR
+flowchart TD
     S[Start]
     A[Enter Email Address]
     B[Enter Name]
