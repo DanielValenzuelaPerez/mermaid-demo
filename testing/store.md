@@ -13,13 +13,13 @@ flowchart LR
     create_cart-->|add item|CART
 ```
 
-#### Endpoint para añadir artículos
+#### Endpoint para añadir artículos:
 ```
 [POST]
 /store/cart_item
 ```
 
-#### Payload para añadir artículos
+#### Payload para añadir artículos:
 ```
 {
     presentation: int,
@@ -29,10 +29,11 @@ flowchart LR
 ```
 
 ### Un solo carrito de compras activo por usuario
-Sólo puede existir un carrito de compras activo por usuario. Esto se controla por medio de los estados en los que pueda estar un carrito. 
-1. **DRAFT**
-2. **RESERVED**
-3. **COMPLETED**
+Sólo puede existir un carrito de compras activo por usuario. Esto se controla por medio de los estados en los que pueda estar un carrito.
+
+    1. DRAFT
+    2. RESERVED
+    3. COMPLETED
 
 *Nota. Los artículos del carrito comparten el mismo estado que el carrito de compras al que pertenecen.*
 
@@ -124,8 +125,124 @@ graph TD
 
 *Notas adicionales. Almacén C no aparece porque no vende en linea. Las órdenes de Cart 1 y 2 ya fueron completadas.*
 
-## Pendiente...
-- Crear Orden a partir de carrito de compras
-- Actualizar Orden para crear orden de pago
-    - Congelar artículos y carrito de compras
-- API Webhook de CLIP
+## Order
+
+### Orden de pago
+
+Las órdenes en la tienda en línea se crean a partir de los artículos asociados al carrito de compras.
+
+```mermaid
+erDiagram
+    USER||--|{CART : has
+    CART||--|{CART_ITEM : contains
+    CART||--||ORDER : has
+    CART {
+        int status
+        int user_id
+    }
+    CART_ITEM {
+        int status
+        int cart_id
+        int available_id
+        int quantity
+        int price
+    }
+    ORDER {
+        int status
+        int cart_id
+        int total
+    }
+```
+
+#### Para crear una orden se hace una llamada al endpoint:
+```
+[POST]
+/store/order
+```
+*Nota. No es necesario mandar payload; se crea a partir del usuario quien haga la llamada.*
+
+#### Los estados de una orden de la tienda en línea son:
+
+    1. DRAFT
+    2. PROCESSING
+    3. PAID
+    4. CONFIRMED
+    5. SENT
+    6. DELIVERED
+    7. CANCELED
+    8. TIME OUT
+    9. FAILED
+
+Una orden comienza en estado **DRAFT**, donde es solamente para visualizar el total de la orden. En este estado la orden aún puede ser modificada.
+
+La orden pasa a **PROCESSING** al momento de actualizar el estado de la orden en el endpoint de la orden.
+
+#### Endpoint para actualizar la orden a PROCESSING:
+
+```
+[PUT]
+/store/order/:id
+```
+
+#### Payload para actualizar la orden a PROCESSING:
+
+```
+{
+    "status": 2
+}
+```
+
+*Nota. Al intentar actualizar a PROCESSING el sistema puede responder con algunos errores; ver sección Posibles errores al querer crear una orden de pago.*
+
+#### Respuesta exitosa de actualizar orden a PROCESSING:
+```
+{
+    "payment_request_id": "27ed09f1-b491-4692-865b-f9731f9c3208",
+    "object_type": "payment_link", 
+    "status": "CHECKOUT_CREATED", 
+    "last_status_message": "Payment Request created succesfully", 
+    "created_at": "2023-02-01T18:27:30Z", 
+    "payment_request_url": "https://completa-tu-pago2.payclip.com/27ed09f1-b491-4692-865b-f9731f9c3208", 
+    "modified_at": "2023-02-01T18:27:30Z", 
+    "expired_at": "2023-02-04T18:27:30Z"
+}
+```
+
+Al cambiar a **PROCESSING**, se genera una enlace de pago (payment_request_url) para pagar en CLIP.  En este momento, el carrito de compras y los artículo se congelan para que no puedan modificarse los artículos mientras el cliente realiza el pago.
+
+El cliente tendrá que realizar su pago entrando al enlace de pago generado por CLIP.
+
+Cuando se pague, CLIP mandará un Webhook al sistema indicando que la orden fue pagada exitosamente. Al recibir esta llamada, el sistema pasará el carrito de compras y los artículos a COMPLETED. También pasará la orden a **PAID**.
+
+```mermaid
+sequenceDiagram
+    actor CLIENT
+    CLIENT->>SYSTEM: [POST] /store/order
+    Note right of SYSTEM: query cart items<br>and create order
+    SYSTEM-->>CLIENT: return order
+    CLIENT->>SYSTEM: [PUT] /store/order/:id
+    Note right of CLIENT: status=2
+    Note right of SYSTEM: validate items availability,<br>user data, and<br>freeze cart & items
+    SYSTEM->>CLIP: request payment order
+    CLIP-->>SYSTEM: return payment order
+    SYSTEM-->>CLIENT: return payment order
+    CLIENT->>CLIP: Pay order
+    CLIP-->>SYSTEM: Order paid successfully
+    Note right of SYSTEM: update order, cart & items
+```
+
+### Posibles errores al querer crear una orden de pago
+
+Para crear una orden de pago, el usuario necesita tener guardado su número de teléfono y una dirección física.
+
+**Error: Por favor agregue una dirección física a su perfil.**
+```
+[POST]
+/common/address_user
+```
+
+**Error: Por favor agregue un correo electrónico y un número de telefono a su perfil.**
+```
+[PUT]
+/common/customer/{id}
+```
