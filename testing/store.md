@@ -63,7 +63,7 @@ El carrito de compras pasa a **COMPLETED** cuando la orden de pago es pagada.
 
 El endpoint para agregar artículos requiere 3 valores en el payload: presentación, modelo y cantidad.
 
-El sistema busca y agrupa todos los availables que tengan la misma presentación y modelo, y que pertenezcan a almacenes que vendan en línea. De esta manera, el sistema le muestra al cliente el total de productos entre todos los almacenes, en lugar de mostrar productos repetidos. La idea es que el cliente pueda agregar artículos al carrito de compras sin tener que revisar disponibilidad por almacén.
+Al momento de recibir una petición, el sistema busca y agrupa todos los availables que tengan la misma presentación y modelo, y que pertenezcan a almacenes que vendan en línea; similar a la manera en la que el sistema le muestra al cliente el total de productos entre todos los almacenes, en lugar de mostrar productos repetidos. La idea es que el cliente pueda agregar artículos al carrito de compras sin tener que revisar disponibilidad por almacén.
 
 ```mermaid
 graph TD
@@ -95,13 +95,13 @@ Carrito de compras del cliente:
 
 ```mermaid
 graph TD
-    endpoint["/store/cart_item"]-->WAREHOUSES
+    endpoint["/store/cart_item"]-->|presentation=121<br>model=34<br>quantity=10|AVAILABLES
 
-    subgraph WAREHOUSES["AVAILABLES IN WAREHOUSES"]
-        A[A<br>available_id=1<br>quantity=5<br>sells_online=True]
-        B[B<br>available_id=2<br>quantity=8<br>sells_online=True]
-        C[C<br>available_id=3<br>quantity=10<br>sells_online=False]
+    subgraph AVAILABLES["FILTERED AVAILABLES"]
+        A[warehouse_id=A<br>available_id=1<br>quantity=5<br>sells_online=True]
+        B[warehouse_id=B<br>available_id=2<br>quantity=8<br>sells_online=True]
     end
+
 
     subgraph CART_ITEMS["CART ITEMS"]
         I_1["ITEM 1"<br>available_id=2<br>quantity=8]
@@ -122,7 +122,7 @@ graph TD
 ```
 *Nota. En este ejemplo, la llamada al endpoint para agregar un artículo al carrito de compras resultó agregando dos artículos por falta de disponibilidad en un almacén.*
 
-*Notas adicionales. Almacén C no vende en linea. Cart 1 y 2 ya fueron completados.*
+*Notas adicionales. Almacén C no aparece porque no vende en linea. Las órdenes de Cart 1 y 2 ya fueron completadas.*
 
 ## Pendiente...
 - Crear Orden a partir de carrito de compras
